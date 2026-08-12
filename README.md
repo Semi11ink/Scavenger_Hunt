@@ -6,6 +6,10 @@ The model was trained using the jetson-inference detectnet.
 The dataset I used can be found at https://universe.roboflow.com/customdatasetyolov8/objects-common-in-ccs
 
 I trained the model with 200 epochs and the default learning rate and batch size.
+
+---------------------GAMEPLAY---------------------
+This game can be played alone or with friends. When first opening the application, the user will see a home page with an option to enter a name and pick an avatar. After creating their player, they can either create a room or join another user's room via a game pin. Game pins are generated after a player creates a room. After joining a room, the user will either see host controls (if they started the room) or wlil see a waiting screen. After the host sets the round duration, number of rounds, and the item pool, they can start the game. During the game, the user will see a prompt to find an object
+
 ---------------------INSTALLATION INSTRUCTIONS---------------------
 
 These are installations instructions for people who have a Windows desktop or laptop and uses Windows terminology and applications. Mac and Linux users will have to find their respective terms and applications, and try their best to follow along.
@@ -29,8 +33,8 @@ NOTE: These files should be on your Jetson. We are just using VS Code to see wha
 11. Make sure you have python installed. If not, run "sudo apt update" then "sudo apt install python3 python3-pip python3-venv" in the terminal
 12. Use "python3 --version" and "pip3 --version" to make sure everything is working
 13. In the Jetson terminal in VS Code, use "cd" to move into the "code" folder (ex. "cd scavenger_app/code")
-14. Run this command in the Jetson terminal in VS Code: "docker build -t my-jetson-app ." (Yes, the period at the end is included.)
-15. Run this command: "docker run -it --runtime nvidia --network host -v $(pwd)/..:/app my-jetson-app"
+14. Run this command in the Jetson terminal in VS Code: "sudo docker build -t my-jetson-app ." (Yes, the period at the end is included.)
+15. Run this command: "sudo docker run -it --runtime nvidia --network host -v $(pwd)/..:/app my-jetson-app"
 16. When the docker container opens, enter "cd code"
 17. Enter "python3 app-v3.py"
 18. You should see lots of stuff come up in the terminal, but at the end you should see "Running on all addresses (0.0.0.0)", "Running on https://127.0.0.1:5000", "Running on https://(your jetson's ip address)", and "Press CTRL+C to quit"
