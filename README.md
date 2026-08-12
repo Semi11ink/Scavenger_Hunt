@@ -25,8 +25,7 @@ Software needed: Visual Studio Code, Web browser
 1. Connect to your Jetson through VS Code using SSH (Make sure the Jetson is connected to your Desktop/Laptop's mobile hotspot)
 2. In the "Explorer" section, create a folder for the application on your Jetson (ex. scavenger_app)
 
-<img width="435" height="147" alt="image" src="https://github.com/user-attachments/assets/8b8e6827-5be6-4ca5-bd9e-a6851c12a791" />
-
+<img width="435" height="147" alt="Screenshot 2026-08-12 164426" src="https://github.com/user-attachments/assets/972c9e47-ed26-408d-87ed-cf69dc5b902b" />
 
 3. Inside this folder, create two folders named "code" and "models" (case-sensitive)
 4. Inside the "code" folder, make another folder named "templates"
@@ -37,8 +36,7 @@ Software needed: Visual Studio Code, Web browser
 9. Download labels.txt and put it into the "models" folder
 10. You should now have app-v3.py, requirements.txt, and Dockerfile inside the "code" folder, index-v3.html inside the "templates" folder, and the .onnx file and labels.txt inside the "models" folder
 
-<img width="369" height="1323" alt="image" src="https://github.com/user-attachments/assets/6c2c9ea0-96a3-45b3-aad6-b2ff80be9862" />
-
+<img width="369" height="430" alt="Screenshot 2026-08-12 164326" src="https://github.com/user-attachments/assets/499d263a-336e-45e3-a613-62ae4be25d73" />
 
 NOTE: These files should be on your Jetson. We are just using VS Code to see what files are on your Jetson
 
