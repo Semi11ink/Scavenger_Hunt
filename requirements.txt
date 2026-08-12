@@ -1,0 +1,6 @@
+flask
+flask-socketio
+onnxruntime
+numpy
+opencv-python
+pillow
