@@ -1,6 +1,11 @@
 # Scavenger_Hunt
 This is my NVIDIA project. It is an application that runs a flask app on the local network that allows multiple people to play a scavenger hunt game on multiple devices. The objective is to find whatever object the game tells you to find, and the game will know if you found it using an object detection model.
 
+The model was trained using the jetson-inference detectnet.
+
+The dataset I used can be found at https://universe.roboflow.com/customdatasetyolov8/objects-common-in-ccs
+
+I trained the model with 200 epochs and the default learning rate and batch size.
 ---------------------INSTALLATION INSTRUCTIONS---------------------
 
 These are installations instructions for people who have a Windows desktop or laptop and uses Windows terminology and applications. Mac and Linux users will have to find their respective terms and applications, and try their best to follow along.
