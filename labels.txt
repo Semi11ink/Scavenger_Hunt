@@ -1,0 +1,33 @@
+BACKGROUND
+Bag
+Bench
+Block
+Book
+Bottle
+Bowl
+Chair
+Cup
+Electric Fan
+Fire Extinguisher
+Fork
+Keyboard
+Laptop
+Monitor
+Motorcycle
+Mouse
+Mug
+Office Chair
+Pen
+Phone
+Plant
+Remote
+Shoe
+Smart TV
+Spoon
+table
+Thumbler
+Trash bin
+Unknown
+Vehicle
+Watch
+Wristwatch
