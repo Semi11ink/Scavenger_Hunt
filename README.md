@@ -57,3 +57,5 @@ NOTE: These files should be on your Jetson. We are just using VS Code to see wha
 24. Your Jetson should be connected to your hotspot. If it is, look at the bottom of the "Properties" Section and you should see the devices connected and their names
 25. Your Jetson's name should be something like nvidia-desktop if you didn't change it
 26. The IP address of the jetson should be next to its name
+
+<img width="2559" height="1533" alt="Screenshot 2026-08-12 163700" src="https://github.com/user-attachments/assets/9ffb4c3b-ded8-4d61-a83c-e2760f37c06e" />
