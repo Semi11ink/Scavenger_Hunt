@@ -23,7 +23,11 @@ Hardware needed: Jetson Orin Nano, Desktop/Laptop with an internet connection an
 Software needed: Visual Studio Code, Web browser
 
 1. Connect to your Jetson through VS Code using SSH (Make sure the Jetson is connected to your Desktop/Laptop's mobile hotspot)
-2. In the "Explorer" section, create a folder for the application (ex. scavenger_app)
+2. In the "Explorer" section, create a folder for the application on your Jetson (ex. scavenger_app)
+
+<img width="435" height="147" alt="image" src="https://github.com/user-attachments/assets/8b8e6827-5be6-4ca5-bd9e-a6851c12a791" />
+
+
 3. Inside this folder, create two folders named "code" and "models" (case-sensitive)
 4. Inside the "code" folder, make another folder named "templates"
 5. Download app-v3.py, requirements.txt, and Dockerfile on your desktop/laptop and drag them into the "code" folder in the VS Code explorer (Dockerfile should have no extension)
@@ -32,6 +36,9 @@ Software needed: Visual Studio Code, Web browser
 8. Drag this .onnx file into the "models" folder in the VS Code explorer
 9. Download labels.txt and put it into the "models" folder
 10. You should now have app-v3.py, requirements.txt, and Dockerfile inside the "code" folder, index-v3.html inside the "templates" folder, and the .onnx file and labels.txt inside the "models" folder
+
+<img width="369" height="1323" alt="image" src="https://github.com/user-attachments/assets/6c2c9ea0-96a3-45b3-aad6-b2ff80be9862" />
+
 
 NOTE: These files should be on your Jetson. We are just using VS Code to see what files are on your Jetson
 
