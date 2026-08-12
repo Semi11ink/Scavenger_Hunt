@@ -22,14 +22,15 @@ NOTE: These files should be on your Jetson. We are just using VS Code to see wha
 11. In the Jetson terminal in VS Code, use "cd" to move into the "code" folder (ex. "cd scavenger_app/code")
 12. Run this command in the Jetson terminal in VS Code: "docker build -t my-jetson-app ." (Yes, the period at the end is included.)
 13. Run this command: "docker run -it --runtime nvidia --network host -v $(pwd)/..:/app my-jetson-app"
-14. When the docker container opens, enter "python code/app-v3.py"
-15. You should see lots of stuff come up in the terminal, but at the end you should see "Running on all addresses (0.0.0.0)", "Running on https://127.0.0.1:5000", "Running on https://(your jetson's ip address)", and "Press CTRL+C to quit"
-16. To play the game, go into your web browser and type in "https://jetson-ip:5000" (replace jetson-ip with your jetson's ip address)
+14. When the docker container opens, enter "cd code"
+15. Enter "python3 app-v3.py"
+16. You should see lots of stuff come up in the terminal, but at the end you should see "Running on all addresses (0.0.0.0)", "Running on https://127.0.0.1:5000", "Running on https://(your jetson's ip address)", and "Press CTRL+C to quit"
+17. To play the game, go into your web browser and type in "https://jetson-ip:5000" (replace jetson-ip with your jetson's ip address)
 
-17. If you don't know how to find your jetson's ip address, follow these steps:
-18. Open settings
-19. Click Network & internet
-20. Click Mobile hotspot
-21. Your Jetson should be connected to your hotspot. If it is, look at the bottom of the "Properties" Section and you should see the devices connected and their names
-22. Your Jetson's name should be something like nvidia-desktop if you didn't change it
-23. The IP address of the jetson should be next to its name
+18. If you don't know how to find your jetson's ip address, follow these steps:
+19. Open settings
+20. Click Network & internet
+21. Click Mobile hotspot
+22. Your Jetson should be connected to your hotspot. If it is, look at the bottom of the "Properties" Section and you should see the devices connected and their names
+23. Your Jetson's name should be something like nvidia-desktop if you didn't change it
+24. The IP address of the jetson should be next to its name
