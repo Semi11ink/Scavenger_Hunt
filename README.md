@@ -19,18 +19,20 @@ Software needed: Visual Studio Code, Web browser
 9. Download labels.txt and put it into the "models" folder
 10. You should now have app-v3.py, requirements.txt, and Dockerfile inside the "code" folder, index-v3.html inside the "templates" folder, and the .onnx file and labels.txt inside the "models" folder
 NOTE: These files should be on your Jetson. We are just using VS Code to see what files are on your Jetson
-11. In the Jetson terminal in VS Code, use "cd" to move into the "code" folder (ex. "cd scavenger_app/code")
-12. Run this command in the Jetson terminal in VS Code: "docker build -t my-jetson-app ." (Yes, the period at the end is included.)
-13. Run this command: "docker run -it --runtime nvidia --network host -v $(pwd)/..:/app my-jetson-app"
-14. When the docker container opens, enter "cd code"
-15. Enter "python3 app-v3.py"
-16. You should see lots of stuff come up in the terminal, but at the end you should see "Running on all addresses (0.0.0.0)", "Running on https://127.0.0.1:5000", "Running on https://(your jetson's ip address)", and "Press CTRL+C to quit"
-17. To play the game, go into your web browser and type in "https://jetson-ip:5000" (replace jetson-ip with your jetson's ip address)
+11. Make sure you have python installed. If not, run "sudo apt update" then "sudo apt install python3 python3-pip python3-venv"
+12. Use "python3 --version" and "pip3 --version" to make sure everything is working
+13. In the Jetson terminal in VS Code, use "cd" to move into the "code" folder (ex. "cd scavenger_app/code")
+14. Run this command in the Jetson terminal in VS Code: "docker build -t my-jetson-app ." (Yes, the period at the end is included.)
+15. Run this command: "docker run -it --runtime nvidia --network host -v $(pwd)/..:/app my-jetson-app"
+16. When the docker container opens, enter "cd code"
+17. Enter "python3 app-v3.py"
+18. You should see lots of stuff come up in the terminal, but at the end you should see "Running on all addresses (0.0.0.0)", "Running on https://127.0.0.1:5000", "Running on https://(your jetson's ip address)", and "Press CTRL+C to quit"
+19. To play the game, go into your web browser and type in "https://jetson-ip:5000" (replace jetson-ip with your jetson's ip address)
 
-18. If you don't know how to find your jetson's ip address, follow these steps:
-19. Open settings
-20. Click Network & internet
-21. Click Mobile hotspot
-22. Your Jetson should be connected to your hotspot. If it is, look at the bottom of the "Properties" Section and you should see the devices connected and their names
-23. Your Jetson's name should be something like nvidia-desktop if you didn't change it
-24. The IP address of the jetson should be next to its name
+20. If you don't know how to find your jetson's ip address, follow these steps:
+21. Open settings
+22. Click Network & internet
+23. Click Mobile hotspot
+24. Your Jetson should be connected to your hotspot. If it is, look at the bottom of the "Properties" Section and you should see the devices connected and their names
+25. Your Jetson's name should be something like nvidia-desktop if you didn't change it
+26. The IP address of the jetson should be next to its name
