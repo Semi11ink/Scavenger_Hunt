@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jetson Scavenger Hunt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        .mirror { transform: scaleX(-1); }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.7); }
+            60% { opacity: 1; transform: scale(1.06); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .target-pop { animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+            50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        }
+        .glow-active { animation: pulseGlow 1.8s ease-in-out infinite; }
+
+        .flash-overlay {
+            position: absolute; inset: 0; opacity: 0; pointer-events: none;
+            transition: opacity 0.15s ease-out;
+        }
+        .flash-overlay.show { transition: opacity 0.05s ease-in; }
+
+        .bbox-box {
+            position: absolute; border: 3px solid #34d399; border-radius: 6px;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.1s ease-out, left 0.08s linear, top 0.08s linear, width 0.08s linear, height 0.08s linear;
+        }
+        .bbox-box.show { opacity: 1; }
+
+        .icon-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 2.5rem; height: 2.5rem; border-radius: 9999px;
+            background: rgba(31,41,55,0.9); border: 1px solid rgba(75,85,99,0.6);
+            transition: all 0.15s ease; cursor: pointer; font-size: 1.1rem;
+        }
+        .icon-btn:hover { background: rgba(55,65,81,1); border-color: rgba(107,114,128,0.8); }
+        .icon-btn:active { transform: scale(0.92); }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-12px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(-12px) scale(0.95); }
+        }
+        .toast-in { animation: toastIn 0.25s ease-out; }
+        .toast-out { animation: toastOut 0.25s ease-in forwards; }
+
+        .lb-row-1 { background: linear-gradient(90deg, rgba(250,204,21,0.18), rgba(250,204,21,0.02)); border-color: rgba(250,204,21,0.45); }
+        .lb-row-2 { background: linear-gradient(90deg, rgba(203,213,225,0.14), rgba(203,213,225,0.02)); border-color: rgba(203,213,225,0.35); }
+        .lb-row-3 { background: linear-gradient(90deg, rgba(217,119,6,0.16), rgba(217,119,6,0.02)); border-color: rgba(217,119,6,0.4); }
+    </style>
+</head>
+<body class="h-full text-gray-100 flex flex-col font-sans antialiased">
+
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-[70]"></canvas>
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[65] flex flex-col gap-2 items-center pointer-events-none w-full px-4"></div>
+    <div id="reaction-layer" class="fixed inset-0 pointer-events-none z-[68] overflow-hidden"></div>
+
+    <!-- PRE-ROUND HYPE COUNTDOWN -->
+    <div id="countdown-overlay" class="hidden fixed inset-0 bg-black/92 backdrop-blur-md flex flex-col items-center justify-center z-[60] text-center">
+        <span id="countdown-teaser" class="text-6xl mb-4">❓</span>
+        <span id="countdown-round-label" class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Round 1</span>
+        <span id="countdown-number" class="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400"></span>
+        <span class="text-sm font-semibold text-gray-400 mt-3">Get ready to hunt!</span>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-gray-900 border-b border-gray-800 py-3 px-6 flex justify-between items-center shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+            <h1 class="text-xl font-black tracking-wider uppercase text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+                Jetson Scavenger
+            </h1>
+        </div>
+        <div id="room-tag" class="hidden flex items-center space-x-2">
+            <div class="text-xs bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-full font-mono text-gray-300">
+                ROOM: <span id="display-room-id" class="text-emerald-400 font-bold">----</span>
+            </div>
+            <button id="mute-toggle" onclick="toggleMute()" class="icon-btn text-gray-300" aria-label="Toggle sound">
+                <span id="mute-icon">🔊</span>
+            </button>
+            <button onclick="leaveRoom()" class="text-xs bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 hover:text-red-100 font-semibold px-3 py-1.5 rounded-full transition-colors shadow-sm">
+                Leave
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-6xl w-full mx-auto p-4 flex flex-col justify-center">
+
+        <!-- LOBBY SCREEN -->
+        <div id="lobby-screen" class="bg-gray-900 border border-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl max-w-lg w-full mx-auto space-y-6">
+            <div class="text-center space-y-1">
+                <h2 class="text-2xl font-bold text-white">Join the Hunt</h2>
+                <p class="text-sm text-gray-400">Enter your name and start or join a game room.</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400">Player Name</label>
+                        <button onclick="randomizeNickname()" class="text-xs text-cyan-400 hover:underline">🎲 Random Name</button>
+                    </div>
+                    <input type="text" id="player-name" placeholder="Enter name..." value="Scavenger_1"
+                           class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Pick Your Avatar</label>
+                    <div id="avatar-picker" class="grid grid-cols-6 gap-2"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-900/30 transition-all active:scale-95">
+                        Create Room
+                    </button>
+                    <div class="flex space-x-2">
+                        <input type="text" id="join-room-id" placeholder="Code" maxlength="4"
+                               class="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-center uppercase tracking-widest text-white focus:outline-none focus:border-cyan-500 transition-colors">
+                        <button onclick="joinRoom()" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-3 rounded-xl shadow-lg shadow-cyan-900/30 transition-all active:scale-95">
+                            Join
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WAITING ROOM / LOBBY CONTROLS -->
+        <div id="waiting-screen" class="hidden bg-gray-900 border border-gray-800 p-6 rounded-2xl shadow-2xl space-y-6 max-w-lg w-full mx-auto">
+            <div class="text-center pb-1">
+                <span class="text-[10px] uppercase tracking-widest text-gray-500 block mb-1">Game PIN</span>
+                <div id="lobby-pin-glow" class="inline-block px-6 py-3 rounded-2xl bg-gray-950 border-2 border-emerald-500/60">
+                    <span id="lobby-pin-display" class="text-4xl font-black tracking-[0.3em] font-mono text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400"></span>
+                </div>
+                <div id="lock-status" class="mt-2 text-[11px] font-semibold text-gray-500">🔓 Open — anyone with the PIN can join</div>
+            </div>
+
+            <div class="flex justify-between items-center border-b border-gray-800 pb-4">
+                <h3 class="text-lg font-bold">Lobby Players</h3>
+                <span id="player-count" class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-2.5 py-1 rounded-full font-semibold">1 Player</span>
+            </div>
+
+            <ul id="player-list" class="space-y-2 max-h-40 overflow-y-auto pr-1"></ul>
+
+            <div id="host-controls" class="hidden space-y-6">
+                <div class="flex items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-4 py-3">
+                    <div>
+                        <label for="host-playing-toggle" class="text-xs font-semibold uppercase tracking-wider text-gray-300 cursor-pointer">I'm Playing Too</label>
+                        <p class="text-[10px] text-gray-500 mt-0.5">Uncheck to run the game without joining as a player.</p>
+                    </div>
+                    <input type="checkbox" id="host-playing-toggle" checked onchange="toggleHostPlaying(this.checked)"
+                           class="w-5 h-5 rounded bg-gray-900 border-gray-700 text-emerald-500 focus:ring-0 cursor-pointer flex-shrink-0">
+                </div>
+
+                <div class="flex items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-4 py-3">
+                    <div>
+                        <label for="lock-room-toggle" class="text-xs font-semibold uppercase tracking-wider text-gray-300 cursor-pointer">Lock Room</label>
+                        <p class="text-[10px] text-gray-500 mt-0.5">Stop new players from joining mid-game.</p>
+                    </div>
+                    <input type="checkbox" id="lock-room-toggle" onchange="toggleLockRoom(this.checked)"
+                           class="w-5 h-5 rounded bg-gray-900 border-gray-700 text-red-500 focus:ring-0 cursor-pointer flex-shrink-0">
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-gray-400">Round Duration</label>
+                        <span id="duration-label" class="text-xs font-mono text-cyan-400 font-bold">30s</span>
+                    </div>
+                    <input type="range" id="duration-slider" min="10" max="90" step="5" value="30"
+                           oninput="onDurationChange(this.value)"
+                           class="w-full accent-cyan-500 cursor-pointer">
+                    <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                        <span>10s</span><span>90s</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-gray-400">Number of Rounds</label>
+                        <span id="rounds-label" class="text-xs font-mono text-cyan-400 font-bold">3</span>
+                    </div>
+                    <input type="range" id="rounds-slider" min="1" max="20" step="1" value="3"
+                           oninput="onRoundsChange(this.value)"
+                           class="w-full accent-cyan-500 cursor-pointer">
+                    <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                        <span>1</span><span>20</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-gray-400">Target Items Pool</label>
+                        <button onclick="selectAllItems()" class="text-xs text-cyan-400 hover:underline">Select All</button>
+                    </div>
+                    <div id="item-checkboxes" class="grid grid-cols-2 gap-2 bg-gray-950 p-3 rounded-xl border border-gray-800 max-h-36 overflow-y-auto text-xs"></div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="leaveRoom()" class="col-span-1 bg-gray-800 hover:bg-red-900/60 border border-gray-700 hover:border-red-700 text-gray-300 hover:text-red-200 font-bold py-4 px-3 rounded-xl transition-all text-xs uppercase tracking-wider">
+                        Leave
+                    </button>
+                    <button id="start-game-btn" onclick="startRound()" class="col-span-2 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-gray-950 font-black py-4 px-4 rounded-xl shadow-xl transition-all active:scale-95 text-center uppercase tracking-wider disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed disabled:hover:from-emerald-500 disabled:hover:to-cyan-500">
+                        Start Game
+                    </button>
+                </div>
+                <p id="start-game-hint" class="hidden text-[10px] text-center text-gray-500 -mt-3">Waiting for at least one player to join...</p>
+            </div>
+
+            <div id="guest-controls" class="hidden space-y-4">
+                <div class="p-4 bg-gray-950 rounded-xl border border-gray-800 text-center space-y-2">
+                    <div class="inline-flex items-center space-x-2 text-yellow-400 font-semibold animate-pulse text-sm">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>Waiting for host to start game...</span>
+                    </div>
+                    <p class="text-xs text-gray-500">The host is setting up the round item pool.</p>
+                </div>
+                <button onclick="leaveRoom()" class="w-full bg-gray-800 hover:bg-red-900/60 border border-gray-700 hover:border-red-700 text-gray-300 hover:text-red-200 font-bold py-3 px-3 rounded-xl transition-all text-xs uppercase tracking-wider">
+                    Leave Room
+                </button>
+            </div>
+        </div>
+
+        <!-- ACTIVE GAMEPLAY HUD & CAMERA -->
+        <div id="game-screen" class="hidden space-y-3">
+            <div id="target-header" class="bg-gradient-to-br border p-4 rounded-2xl flex justify-between items-center shadow-xl transition-colors duration-500">
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 block">Find This Item</span>
+                    <h2 id="target-display" class="text-2xl md:text-3xl font-black text-yellow-400 tracking-wide">Searching...</h2>
+                    <span id="found-counter" class="text-[11px] font-mono text-gray-500">0 / 0 found</span>
+                    <span id="round-progress" class="text-[11px] font-mono text-gray-500 block">Round 1 / 1</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 block">Time Left</span>
+                    <div id="timer-display" class="text-3xl md:text-4xl font-black font-mono text-emerald-400">30s</div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex gap-2">
+                    <button onclick="flipCamera()" class="icon-btn text-gray-300" aria-label="Flip camera">🔄</button>
+                    <button onclick="toggleMute()" class="icon-btn text-gray-300" aria-label="Toggle sound">
+                        <span id="mute-icon-game">🔊</span>
+                    </button>
+                </div>
+                <div id="host-game-controls" class="hidden flex items-center gap-2 flex-wrap justify-end">
+                    <span id="host-hunting-ticker" class="text-xs font-mono bg-gray-950 border border-gray-800 text-cyan-400 font-bold px-3 py-2 rounded-full">🏃 0/0 still hunting</span>
+                    <button onclick="skipRound()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 font-bold px-3 py-2 rounded-full transition-colors">
+                        Skip Round (voids points)
+                    </button>
+                    <button onclick="endGame()" class="text-xs bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 font-bold px-3 py-2 rounded-full transition-colors">
+                        End Game
+                    </button>
+                </div>
+            </div>
+
+            <div id="video-container" class="relative w-full aspect-video min-h-[500px] md:min-h-[650px] bg-black rounded-2xl overflow-hidden border border-gray-800 shadow-2xl transition-shadow">
+                <video id="webcam" autoplay playsinline class="w-full h-full object-cover mirror"></video>
+                <canvas id="canvas" class="hidden"></canvas>
+
+                <div id="flash-overlay" class="flash-overlay"></div>
+                <div id="bbox-box" class="bbox-box"></div>
+
+                <div class="absolute bottom-4 left-4 right-4 flex items-end justify-between">
+                    <div class="bg-gray-950/85 backdrop-blur-md border border-gray-800 px-3.5 py-2.5 rounded-xl shadow-2xl">
+                        <span id="hold-status" class="text-xs font-bold text-gray-300">Hold target in full view...</span>
+                    </div>
+                    <svg width="72" height="72" viewBox="0 0 72 72" class="drop-shadow-2xl">
+                        <defs>
+                            <linearGradient id="holdGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#facc15"/>
+                                <stop offset="55%" stop-color="#34d399"/>
+                                <stop offset="100%" stop-color="#22d3ee"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="36" cy="36" r="28" fill="rgba(3,7,18,0.85)" stroke="#1f2937" stroke-width="6"/>
+                        <circle id="hold-ring-track" cx="36" cy="36" r="28" fill="none" stroke="#334155" stroke-width="6"/>
+                        <circle id="hold-ring-progress" cx="36" cy="36" r="28" fill="none" stroke="url(#holdGradient)"
+                                stroke-width="6" stroke-linecap="round" transform="rotate(-90 36 36)"
+                                stroke-dasharray="175.93" stroke-dashoffset="175.93"
+                                style="transition: stroke-dashoffset 0.1s linear;"/>
+                        <text id="hold-ring-text" x="36" y="41" text-anchor="middle" class="fill-white font-mono font-bold" style="font-size:15px;">0%</text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- BETWEEN-ROUND KAHOOT-STYLE LEADERBOARD -->
+    <div id="leaderboard-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-900 border border-gray-800 text-white rounded-2xl p-6 text-center max-w-md w-full shadow-2xl space-y-4">
+            <div>
+                <h3 id="lb-title" class="text-3xl font-black mb-1">Round Over!</h3>
+                <p id="lb-message" class="text-sm text-gray-300"></p>
+            </div>
+
+            <div class="text-left">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Leaderboard</span>
+                <ul id="lb-list" class="space-y-1.5 mt-1.5"></ul>
+            </div>
+
+            <div id="lb-breakdown" class="text-left text-[11px] text-gray-400 space-y-1 max-h-20 overflow-y-auto"></div>
+
+            <div class="flex items-center justify-center gap-3 pt-1">
+                <span class="text-[10px] uppercase tracking-wider text-gray-500">React:</span>
+                <button onclick="sendReaction('👍')" class="icon-btn text-lg">👍</button>
+                <button onclick="sendReaction('🔥')" class="icon-btn text-lg">🔥</button>
+                <button onclick="sendReaction('😂')" class="icon-btn text-lg">😂</button>
+            </div>
+
+            <div id="lb-host-continue" class="hidden pt-1">
+                <button id="lb-continue-btn" onclick="continueAfterRound()"
+                        class="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-gray-950 font-black py-3 px-4 rounded-xl shadow-xl transition-all active:scale-95 text-center uppercase tracking-wider text-sm">
+                    Continue to Next Round
+                </button>
+            </div>
+            <div id="lb-guest-wait" class="hidden pt-1">
+                <div class="inline-flex items-center space-x-2 text-xs font-bold text-cyan-400">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span>Waiting for host to continue... look around as long as you like!</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PODIUM / MATCH END MODAL -->
+    <div id="podium-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-900 border border-gray-800 text-white rounded-2xl p-6 text-center max-w-sm w-full shadow-2xl space-y-5">
+            <div>
+                <h3 class="text-3xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Final Results</h3>
+                <p class="text-sm text-gray-400">Match complete</p>
+            </div>
+            <div id="podium-winner-banner" class="hidden rounded-xl border-2 border-yellow-500/70 bg-gradient-to-br from-yellow-500/15 to-amber-500/5 px-4 py-4 shadow-[0_0_25px_rgba(250,204,21,0.25)]">
+                <div class="text-[10px] font-black uppercase tracking-[0.3em] text-yellow-400 mb-1">🏆 Winner</div>
+                <div class="flex items-center justify-center gap-2">
+                    <span id="podium-winner-avatar" class="w-9 h-9 rounded-full flex items-center justify-center text-base font-black text-gray-950"></span>
+                    <span id="podium-winner-name" class="text-xl font-black text-white"></span>
+                </div>
+                <div id="podium-winner-score" class="text-sm font-mono text-yellow-300 font-bold mt-1"></div>
+            </div>
+            <ul id="podium-list" class="space-y-2 text-left"></ul>
+            <div id="podium-host-actions" class="hidden grid grid-cols-2 gap-3 pt-2">
+                <button onclick="leaveRoom()" class="bg-gray-800 hover:bg-red-900/60 border border-gray-700 hover:border-red-700 text-gray-300 hover:text-red-200 font-bold py-3 px-3 rounded-xl transition-all text-xs uppercase tracking-wider">
+                    Leave
+                </button>
+                <button onclick="playAgain()" class="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-gray-950 font-black py-3 px-4 rounded-xl shadow-xl transition-all active:scale-95 text-xs uppercase tracking-wider">
+                    Play Again
+                </button>
+            </div>
+            <div id="podium-guest-actions" class="hidden pt-2">
+                <p class="text-xs text-gray-500 mb-3">Waiting for host to start a new match, or...</p>
+                <button onclick="leaveRoom()" class="w-full bg-gray-800 hover:bg-red-900/60 border border-gray-700 hover:border-red-700 text-gray-300 hover:text-red-200 font-bold py-3 px-3 rounded-xl transition-all text-xs uppercase tracking-wider">
+                    Leave Room
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        let currentRoomId = null;
+        let currentTarget = null;
+        let holdProgress = 0;
+        let foundThisRound = false;
+        let isHost = false;
+        let frameInterval = null;
+        let facingMode = 'environment';
+        let isMuted = false;
+        let audioCtx = null;
+        let selectedDuration = 30;
+        let selectedTotalRounds = 3;
+        let lastWinnerSid = null;
+        let winStreak = 0;
+        let lastKnownPlayers = {};
+        let foundCountThisRound = 0;
+        let seenPlayerSids = new Set();
+        let selectedAvatar = '🦊';
+        let selectedColor = null;
+
+        const HOLD_INCREMENT = 20;
+        const HOLD_DECAY = 8;
+        const RING_CIRCUMFERENCE = 175.93;
+
+        const PLAYER_COLORS = ['#34d399', '#22d3ee', '#f472b6', '#fbbf24', '#a78bfa', '#fb7185', '#4ade80', '#60a5fa'];
+        const AVATAR_EMOJIS = ['🦊', '🐼', '🐸', '🐵', '🐯', '🐧', '🦁', '🐨', '🦄', '🐙', '🦖', '🐝'];
+        const NICKNAME_ADJECTIVES = ['Sneaky', 'Turbo', 'Wobbly', 'Mighty', 'Sleepy', 'Zippy', 'Silent', 'Rowdy', 'Cosmic', 'Fuzzy', 'Dizzy', 'Sly'];
+        const NICKNAME_NOUNS = ['Ferret', 'Waffle', 'Rocket', 'Goblin', 'Noodle', 'Falcon', 'Pickle', 'Yeti', 'Otter', 'Cactus', 'Meerkat', 'Biscuit'];
+        const ROUND_THEMES = [
+            { header: 'from-emerald-500/10 to-cyan-500/10 border-emerald-500/40' },
+            { header: 'from-fuchsia-500/10 to-pink-500/10 border-fuchsia-500/40' },
+            { header: 'from-amber-500/10 to-orange-500/10 border-amber-500/40' },
+            { header: 'from-sky-500/10 to-blue-500/10 border-sky-500/40' },
+            { header: 'from-violet-500/10 to-purple-500/10 border-violet-500/40' }
+        ];
+
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const waitingScreen = document.getElementById('waiting-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const hostControls = document.getElementById('host-controls');
+        const guestControls = document.getElementById('guest-controls');
+        const hostGameControls = document.getElementById('host-game-controls');
+        const roomTag = document.getElementById('room-tag');
+        const displayRoomId = document.getElementById('display-room-id');
+
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const videoContainer = document.getElementById('video-container');
+
+        const holdStatus = document.getElementById('hold-status');
+        const holdRingProgress = document.getElementById('hold-ring-progress');
+        const holdRingTrack = document.getElementById('hold-ring-track');
+        const holdRingText = document.getElementById('hold-ring-text');
+        const bboxBox = document.getElementById('bbox-box');
+        const flashOverlay = document.getElementById('flash-overlay');
+        const timerDisplay = document.getElementById('timer-display');
+        const targetDisplay = document.getElementById('target-display');
+        const targetHeader = document.getElementById('target-header');
+        const foundCounterEl = document.getElementById('found-counter');
+        const leaderboardModal = document.getElementById('leaderboard-modal');
+        const podiumModal = document.getElementById('podium-modal');
+        const toastContainer = document.getElementById('toast-container');
+
+        // ---------- Sound ----------
+        function playTone(freq, duration, type) {
+            if (isMuted) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type || 'sine';
+                osc.frequency.value = freq;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+        function playWinSound() {
+            playTone(523.25, 0.15, 'sine');
+            setTimeout(() => playTone(659.25, 0.15, 'sine'), 110);
+            setTimeout(() => playTone(783.99, 0.3, 'sine'), 220);
+        }
+        function playSoftChime() { playTone(660, 0.12, 'sine'); }
+        function playTimeoutSound() { playTone(196, 0.35, 'sawtooth'); }
+        function playSkipSound() { playTone(330, 0.15, 'triangle'); }
+        function playCountdownBeep() { playTone(440, 0.1, 'square'); }
+        function playRoundStartSting() {
+            playTone(392, 0.09, 'square');
+            setTimeout(() => playTone(523.25, 0.09, 'square'), 90);
+            setTimeout(() => playTone(659.25, 0.18, 'square'), 180);
+        }
+        function playFinalRoundFanfare() {
+            playTone(523.25, 0.12, 'triangle');
+            setTimeout(() => playTone(659.25, 0.12, 'triangle'), 100);
+            setTimeout(() => playTone(783.99, 0.12, 'triangle'), 200);
+            setTimeout(() => playTone(1046.5, 0.25, 'triangle'), 300);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const icon = isMuted ? '🔇' : '🔊';
+            document.getElementById('mute-icon').innerText = icon;
+            document.getElementById('mute-icon-game').innerText = icon;
+        }
+
+        // ---------- Toasts ----------
+        function showToast(html, opts) {
+            opts = opts || {};
+            const el = document.createElement('div');
+            el.className = `toast-in pointer-events-none max-w-sm w-full rounded-xl border px-4 py-2.5 shadow-2xl text-sm font-semibold text-center ${opts.className || 'bg-gray-900/95 border-gray-700 text-gray-100'}`;
+            el.innerHTML = html;
+            toastContainer.appendChild(el);
+            setTimeout(() => {
+                el.classList.remove('toast-in');
+                el.classList.add('toast-out');
+                setTimeout(() => el.remove(), 260);
+            }, opts.duration || 2600);
+        }
+
+        // ---------- Confetti ----------
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+        let confettiParticles = [];
+        let confettiRAF = null;
+
+        function resizeConfettiCanvas() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeConfettiCanvas);
+        resizeConfettiCanvas();
+
+        function spawnConfetti(count) {
+            resizeConfettiCanvas();
+            confettiParticles = [];
+            const colors = PLAYER_COLORS;
+            const n = count || 120;
+            for (let i = 0; i < n; i++) {
+                confettiParticles.push({
+                    x: Math.random() * confettiCanvas.width,
+                    y: -20 - Math.random() * confettiCanvas.height * 0.3,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: 2 + Math.random() * 3,
+                    size: 4 + Math.random() * 5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * 360,
+                    vr: (Math.random() - 0.5) * 12
+                });
+            }
+            const start = performance.now();
+            if (confettiRAF) cancelAnimationFrame(confettiRAF);
+            function tick(now) {
+                confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                let alive = false;
+                const elapsed = now - start;
+                confettiParticles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.03;
+                    p.rotation += p.vr;
+                    if (p.y < confettiCanvas.height + 20) alive = true;
+                    confettiCtx.save();
+                    confettiCtx.translate(p.x, p.y);
+                    confettiCtx.rotate(p.rotation * Math.PI / 180);
+                    confettiCtx.fillStyle = p.color;
+                    confettiCtx.globalAlpha = elapsed > 2200 ? Math.max(0, 1 - (elapsed - 2200) / 500) : 1;
+                    confettiCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+                    confettiCtx.restore();
+                });
+                if (alive && elapsed < 2700) {
+                    confettiRAF = requestAnimationFrame(tick);
+                } else {
+                    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                }
+            }
+            confettiRAF = requestAnimationFrame(tick);
+        }
+
+        // ---------- Flash ----------
+        function flashScreen(color) {
+            flashOverlay.style.background = color === 'green' ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)';
+            flashOverlay.classList.add('show');
+            flashOverlay.style.opacity = '1';
+            setTimeout(() => { flashOverlay.style.opacity = '0'; }, 180);
+        }
+
+        // ---------- Player colors / avatars ----------
+        function colorForSid(sid) {
+            let h = 0;
+            for (let i = 0; i < sid.length; i++) h = (h * 31 + sid.charCodeAt(i)) >>> 0;
+            return PLAYER_COLORS[h % PLAYER_COLORS.length];
+        }
+        function initialsFor(name) {
+            return (name || '?').trim().charAt(0).toUpperCase();
+        }
+        function colorForPlayer(sid, p) {
+            return (p && p.color) ? p.color : colorForSid(sid);
+        }
+        function avatarFor(p) {
+            return (p && p.avatar) ? p.avatar : initialsFor(p ? p.name : '');
+        }
+        function streakBadge(streak) {
+            return (streak && streak >= 2) ? `<span class="text-orange-400 text-xs" title="${streak} in a row">🔥${streak}</span>` : '';
+        }
+
+        function renderAvatarPicker() {
+            const picker = document.getElementById('avatar-picker');
+            picker.innerHTML = '';
+            AVATAR_EMOJIS.forEach((emoji, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.innerText = emoji;
+                btn.className = 'avatar-swatch text-xl rounded-xl border-2 py-2 transition-all ' +
+                    (emoji === selectedAvatar ? 'border-emerald-500 bg-emerald-950/50 scale-105' : 'border-gray-800 bg-gray-950 hover:border-gray-600');
+                btn.onclick = () => {
+                    selectedAvatar = emoji;
+                    selectedColor = PLAYER_COLORS[i % PLAYER_COLORS.length];
+                    renderAvatarPicker();
+                };
+                picker.appendChild(btn);
+            });
+        }
+        renderAvatarPicker();
+
+        function randomizeNickname() {
+            const adj = NICKNAME_ADJECTIVES[Math.floor(Math.random() * NICKNAME_ADJECTIVES.length)];
+            const noun = NICKNAME_NOUNS[Math.floor(Math.random() * NICKNAME_NOUNS.length)];
+            document.getElementById('player-name').value = `${adj}${noun}${Math.floor(Math.random() * 100)}`;
+            selectedAvatar = AVATAR_EMOJIS[Math.floor(Math.random() * AVATAR_EMOJIS.length)];
+            selectedColor = PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
+            renderAvatarPicker();
+        }
+
+        function selectAllItems() {
+            document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = true);
+        }
+
+        function onDurationChange(val) {
+            selectedDuration = parseInt(val, 10);
+            document.getElementById('duration-label').innerText = `${selectedDuration}s`;
+        }
+
+        function onRoundsChange(val) {
+            selectedTotalRounds = Math.max(1, parseInt(val, 10) || 1);
+            document.getElementById('rounds-label').innerText = `${selectedTotalRounds}`;
+        }
+
+        function toggleHostPlaying(checked) {
+            if (!isHost || !currentRoomId) return;
+            socket.emit('toggle_host_playing', { room_id: currentRoomId, playing: checked, avatar: selectedAvatar, color: selectedColor });
+        }
+
+        function toggleLockRoom(checked) {
+            if (!isHost || !currentRoomId) return;
+            socket.emit('toggle_lock_room', { room_id: currentRoomId, locked: checked });
+        }
+
+        function kickPlayer(sid) {
+            if (!isHost || !currentRoomId) return;
+            socket.emit('kick_player', { room_id: currentRoomId, sid: sid });
+        }
+
+        function sendReaction(emoji) {
+            if (!currentRoomId) return;
+            socket.emit('send_reaction', { room_id: currentRoomId, emoji: emoji });
+        }
+
+        function spawnReactionFloat(emoji, name) {
+            const layer = document.getElementById('reaction-layer');
+            const el = document.createElement('div');
+            const leftPct = 10 + Math.random() * 80;
+            el.style.left = `${leftPct}%`;
+            el.style.bottom = '10%';
+            el.style.position = 'absolute';
+            el.style.fontSize = '2rem';
+            el.style.transition = 'transform 1.8s ease-out, opacity 1.8s ease-out';
+            el.style.opacity = '1';
+            el.innerText = emoji;
+            layer.appendChild(el);
+            requestAnimationFrame(() => {
+                el.style.transform = 'translateY(-220px)';
+                el.style.opacity = '0';
+            });
+            setTimeout(() => el.remove(), 1900);
+        }
+
+        socket.on('room_lock_updated', (data) => {
+            const status = document.getElementById('lock-status');
+            const toggle = document.getElementById('lock-room-toggle');
+            if (toggle) toggle.checked = data.locked;
+            if (status) {
+                status.innerText = data.locked ? '🔒 Locked — no new players can join' : '🔓 Open — anyone with the PIN can join';
+                status.className = data.locked ? 'mt-2 text-[11px] font-semibold text-red-400' : 'mt-2 text-[11px] font-semibold text-gray-500';
+            }
+        });
+
+        socket.on('kicked', (data) => {
+            alert(data.message || 'You were removed from the room.');
+            resetToLobby();
+        });
+
+        socket.on('toast_message', (data) => {
+            showToast(data.message, { className: 'bg-gray-900/95 border-gray-700 text-gray-200' });
+        });
+
+        socket.on('reaction_received', (data) => {
+            spawnReactionFloat(data.emoji, data.name);
+        });
+
+        socket.emit('get_available_items');
+        socket.on('available_items_list', (data) => {
+            const container = document.getElementById('item-checkboxes');
+            container.innerHTML = '';
+            data.items.forEach(item => {
+                container.innerHTML += `
+                    <label class="flex items-center space-x-2 text-gray-300 cursor-pointer select-none">
+                        <input type="checkbox" value="${item}" checked class="item-checkbox rounded bg-gray-900 border-gray-700 text-emerald-500 focus:ring-0">
+                        <span class="truncate">${item}</span>
+                    </label>
+                `;
+            });
+        });
+
+        function createRoom() {
+            const name = document.getElementById('player-name').value.trim() || 'Player 1';
+            socket.emit('create_room', { name: name, avatar: selectedAvatar, color: selectedColor });
+        }
+
+        function joinRoom() {
+            const name = document.getElementById('player-name').value.trim() || 'Player 2';
+            const roomCode = document.getElementById('join-room-id').value.trim();
+            if (roomCode) socket.emit('join_room', { name: name, room_id: roomCode, avatar: selectedAvatar, color: selectedColor });
+        }
+
+        function leaveRoom() {
+            if (currentRoomId) socket.emit('leave_room', { room_id: currentRoomId });
+            resetToLobby();
+        }
+
+        function resetToLobby() {
+            if (frameInterval) clearInterval(frameInterval);
+            if (confettiRAF) cancelAnimationFrame(confettiRAF);
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+            currentRoomId = null;
+            currentTarget = null;
+            foundThisRound = false;
+            isHost = false;
+            holdProgress = 0;
+            lastWinnerSid = null;
+            winStreak = 0;
+            foundCountThisRound = 0;
+
+            roomTag.classList.add('hidden');
+            waitingScreen.classList.add('hidden');
+            hostControls.classList.add('hidden');
+            guestControls.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            leaderboardModal.classList.add('hidden');
+            podiumModal.classList.add('hidden');
+            countdownOverlay.classList.add('hidden');
+            document.getElementById('podium-winner-banner').classList.add('hidden');
+            videoContainer.classList.remove('glow-active');
+            seenPlayerSids = new Set();
+            lobbyScreen.classList.remove('hidden');
+        }
+
+        socket.on('room_created', (data) => setupLobby(data.room_id, data.players, data.host_sid, data.round_active, data.host_playing, data.locked));
+        socket.on('room_joined', (data) => setupLobby(data.room_id, data.players, data.host_sid, data.round_active, undefined, data.locked));
+
+        socket.on('player_left', (data) => {
+            lastKnownPlayers = data.players;
+            updatePlayerList(data.players);
+            if (data.host_sid) {
+                isHost = (socket.id === data.host_sid);
+                renderRoleControls();
+            }
+        });
+
+        socket.on('player_list_updated', (data) => {
+            lastKnownPlayers = data.players;
+            updatePlayerList(data.players);
+        });
+
+        function setupLobby(roomId, players, hostSid, isRoundActive, hostPlaying, locked) {
+            currentRoomId = roomId;
+            isHost = (socket.id === hostSid);
+            lastKnownPlayers = players;
+            seenPlayerSids = new Set(Object.keys(players));
+
+            displayRoomId.innerText = roomId;
+            document.getElementById('lobby-pin-display').innerText = roomId;
+            roomTag.classList.remove('hidden');
+            lobbyScreen.classList.add('hidden');
+            podiumModal.classList.add('hidden');
+
+            if (isHost && typeof hostPlaying === 'boolean') {
+                document.getElementById('host-playing-toggle').checked = hostPlaying;
+            }
+            if (isHost) {
+                document.getElementById('lock-room-toggle').checked = !!locked;
+            }
+            const lockStatus = document.getElementById('lock-status');
+            lockStatus.innerText = locked ? '🔒 Locked — no new players can join' : '🔓 Open — anyone with the PIN can join';
+            lockStatus.className = locked ? 'mt-2 text-[11px] font-semibold text-red-400' : 'mt-2 text-[11px] font-semibold text-gray-500';
+
+            updatePlayerList(players);
+            initWebcam();
+
+            if (!isRoundActive) {
+                gameScreen.classList.add('hidden');
+                waitingScreen.classList.remove('hidden');
+                renderRoleControls();
+            }
+        }
+
+        function renderRoleControls() {
+            if (isHost) {
+                hostControls.classList.remove('hidden');
+                guestControls.classList.add('hidden');
+                hostGameControls.classList.remove('hidden');
+            } else {
+                hostControls.classList.add('hidden');
+                guestControls.classList.remove('hidden');
+                hostGameControls.classList.add('hidden');
+            }
+        }
+
+        function updatePlayerList(players) {
+            const list = document.getElementById('player-list');
+            const count = document.getElementById('player-count');
+            list.innerHTML = '';
+            const playerEntries = Object.entries(players);
+
+            count.innerText = `${playerEntries.length} Player${playerEntries.length > 1 ? 's' : ''}`;
+            updateStartButtonState(playerEntries.length);
+
+            playerEntries.forEach(([sid, p]) => {
+                const color = colorForPlayer(sid, p);
+                const isThisPlayerHost = p.is_host ? '<span class="ml-1 text-[10px] bg-yellow-950 text-yellow-400 border border-yellow-800 px-1.5 py-0.5 rounded font-bold uppercase">Host</span>' : '';
+                const isNew = !seenPlayerSids.has(sid);
+                const kickBtn = (isHost && !p.is_host) ? `<button onclick="kickPlayer('${sid}')" class="ml-2 text-red-400/70 hover:text-red-300 text-xs" aria-label="Kick player">✕</button>` : '';
+                const li = document.createElement('li');
+                li.className = `flex justify-between items-center bg-gray-950 px-3.5 py-2.5 rounded-xl border border-gray-800 text-xs font-semibold ${isNew ? 'target-pop' : ''}`;
+                li.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black text-gray-950 mr-2" style="background:${color}">${avatarFor(p)}</span>
+                        <span class="text-gray-200">${p.name}</span>
+                        ${isThisPlayerHost}
+                    </div>
+                    <div class="flex items-center">
+                        <span class="font-mono text-emerald-400">${p.score} pts</span>
+                        ${kickBtn}
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+            seenPlayerSids = new Set(playerEntries.map(([sid]) => sid));
+        }
+
+        function updateStartButtonState(playerCount) {
+            const btn = document.getElementById('start-game-btn');
+            const hint = document.getElementById('start-game-hint');
+            if (!btn) return;
+            const hasPlayers = playerCount > 0;
+            btn.disabled = !hasPlayers;
+            hint.classList.toggle('hidden', hasPlayers);
+        }
+
+        async function initWebcam(mode) {
+            const useMode = mode || facingMode;
+            try {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(t => t.stop());
+                    video.srcObject = null;
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: useMode }
+                });
+                video.srcObject = stream;
+                facingMode = useMode;
+                video.classList.toggle('mirror', facingMode === 'user');
+            } catch (err) {
+                alert("Camera access required to play!");
+            }
+        }
+
+        function flipCamera() {
+            const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+            initWebcam(nextMode);
+        }
+
+        function startFrameCapture() {
+            if (frameInterval) clearInterval(frameInterval);
+
+            frameInterval = setInterval(() => {
+                if (!currentRoomId || foundThisRound) return;
+
+                canvas.width = 640;
+                canvas.height = 480;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob((blob) => {
+                    if (blob && !foundThisRound) {
+                        blob.arrayBuffer().then(buffer => {
+                            socket.emit('process_frame', { room_id: currentRoomId, image: buffer });
+                        });
+                    }
+                }, 'image/jpeg', 0.6);
+            }, 150);
+        }
+
+        function startRound() {
+            if (!isHost) return;
+            if (Object.keys(lastKnownPlayers).length === 0) return;
+            const selected = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.value);
+            socket.emit('start_round', {
+                room_id: currentRoomId,
+                selected_items: selected,
+                duration: selectedDuration,
+                total_rounds: selectedTotalRounds
+            });
+        }
+
+        function skipRound() {
+            if (!isHost) return;
+            socket.emit('skip_round', { room_id: currentRoomId });
+        }
+
+        function continueAfterRound() {
+            if (!isHost) return;
+            const btn = document.getElementById('lb-continue-btn');
+            if (btn) btn.disabled = true;
+            socket.emit('continue_after_round', { room_id: currentRoomId });
+        }
+
+        function endGame() {
+            if (!isHost) return;
+            socket.emit('end_game', { room_id: currentRoomId });
+        }
+
+        function playAgain() {
+            if (!isHost) return;
+            socket.emit('play_again', { room_id: currentRoomId });
+        }
+
+        function applyRoundTheme(roundNumber) {
+            const theme = ROUND_THEMES[(roundNumber - 1 + ROUND_THEMES.length) % ROUND_THEMES.length];
+            targetHeader.className = `bg-gradient-to-br border p-4 rounded-2xl flex justify-between items-center shadow-xl transition-colors duration-500 ${theme.header}`;
+        }
+
+        function updateHoldRing(percent, confidence) {
+            const offset = RING_CIRCUMFERENCE * (1 - percent / 100);
+            holdRingProgress.style.strokeDashoffset = offset;
+            holdRingText.innerText = `${Math.round(percent)}%`;
+
+            const conf = confidence || 0;
+            const t = Math.min(1, conf / 100);
+            const cold = [51, 65, 85];
+            const warm = [245, 158, 11];
+            const mixed = cold.map((c, i) => Math.round(c + (warm[i] - c) * t));
+            holdRingTrack.setAttribute('stroke', `rgb(${mixed[0]},${mixed[1]},${mixed[2]})`);
+        }
+
+        function setHoldRingFound() {
+            holdRingProgress.style.strokeDashoffset = 0;
+            holdRingText.innerText = '✓';
+            holdRingTrack.setAttribute('stroke', '#34d399');
+        }
+
+        function showBoundingBox(bbox) {
+            if (!bbox) {
+                bboxBox.classList.remove('show');
+                return;
+            }
+            let [left, top, right, bottom] = bbox;
+            if (facingMode === 'user') {
+                const l = left, r = right;
+                left = 1 - r;
+                right = 1 - l;
+            }
+            bboxBox.style.left = `${left * 100}%`;
+            bboxBox.style.top = `${top * 100}%`;
+            bboxBox.style.width = `${(right - left) * 100}%`;
+            bboxBox.style.height = `${(bottom - top) * 100}%`;
+            bboxBox.classList.add('show');
+        }
+
+        function updateFoundCounter() {
+            const total = Object.keys(lastKnownPlayers).length;
+            foundCounterEl.innerText = `${foundCountThisRound} / ${total} found`;
+            const ticker = document.getElementById('host-hunting-ticker');
+            if (ticker) {
+                const stillHunting = Math.max(0, total - foundCountThisRound);
+                ticker.innerText = `🏃 ${stillHunting}/${total} still hunting`;
+            }
+        }
+
+        const countdownOverlay = document.getElementById('countdown-overlay');
+        const countdownNumber = document.getElementById('countdown-number');
+        const countdownRoundLabel = document.getElementById('countdown-round-label');
+
+        socket.on('round_countdown', (data) => {
+            if (frameInterval) clearInterval(frameInterval);
+            leaderboardModal.classList.add('hidden');
+            podiumModal.classList.add('hidden');
+            waitingScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+
+            countdownRoundLabel.innerText = data.is_final_round
+                ? `Final Round \u2014 ${data.round_number} / ${data.total_rounds}`
+                : `Round ${data.round_number} / ${data.total_rounds}`;
+            countdownOverlay.classList.remove('hidden');
+
+            let n = data.countdown || 3;
+            countdownNumber.innerText = n;
+            playCountdownBeep();
+            const tick = setInterval(() => {
+                n -= 1;
+                if (n > 0) {
+                    countdownNumber.innerText = n;
+                    playCountdownBeep();
+                } else {
+                    countdownNumber.innerText = 'GO!';
+                    playRoundStartSting();
+                    clearInterval(tick);
+                }
+            }, 1000);
+        });
+
+        socket.on('round_started', (data) => {
+            countdownOverlay.classList.add('hidden');
+            currentTarget = data.target;
+            foundThisRound = false;
+            holdProgress = 0;
+            foundCountThisRound = 0;
+            updateHoldRing(0, 0);
+            updateFoundCounter();
+            showBoundingBox(null);
+
+            targetDisplay.innerText = currentTarget;
+            targetDisplay.classList.remove('target-pop');
+            void targetDisplay.offsetWidth;
+            targetDisplay.classList.add('target-pop');
+
+            applyRoundTheme(data.round_number);
+            timerDisplay.innerText = `${data.time_remaining || data.duration}s`;
+            timerDisplay.className = "text-3xl md:text-4xl font-black font-mono text-emerald-400";
+            document.getElementById('round-progress').innerText = `Round ${data.round_number} / ${data.total_rounds || data.round_number}`;
+
+            waitingScreen.classList.add('hidden');
+            leaderboardModal.classList.add('hidden');
+            podiumModal.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            videoContainer.classList.add('glow-active');
+            holdStatus.innerText = `Hold ${currentTarget} steady in view...`;
+
+            startFrameCapture();
+        });
+
+        socket.on('timer_tick', (data) => {
+            const remaining = data.time_remaining;
+            timerDisplay.innerText = `${remaining}s`;
+
+            if (remaining <= 5) {
+                timerDisplay.className = "text-3xl md:text-4xl font-black font-mono text-red-500 animate-pulse";
+            } else if (remaining <= 10) {
+                timerDisplay.className = "text-3xl md:text-4xl font-black font-mono text-orange-400";
+            } else {
+                timerDisplay.className = "text-3xl md:text-4xl font-black font-mono text-emerald-400";
+            }
+        });
+
+        socket.on('frame_result', (data) => {
+            if (foundThisRound) return;
+
+            if (data.detected) {
+                holdProgress = Math.min(100, holdProgress + HOLD_INCREMENT);
+                showBoundingBox(data.bbox);
+            } else {
+                holdProgress = Math.max(0, holdProgress - HOLD_DECAY);
+                showBoundingBox(null);
+            }
+
+            updateHoldRing(holdProgress, data.confidence);
+
+            if (holdProgress >= 100 && !foundThisRound) {
+                socket.emit('confirm_target_found', {
+                    room_id: currentRoomId,
+                    confidence: data.confidence
+                });
+            }
+        });
+
+        // A player found the target -- round KEEPS GOING so everyone else can still score.
+        socket.on('player_found', (data) => {
+            foundCountThisRound = data.rank;
+            updateFoundCounter();
+
+            const isMe = (data.sid === socket.id);
+
+            const streakTag = (data.streak_bonus > 0) ? ` 🔥 ${data.streak}-streak +${data.streak_bonus}` : '';
+
+            if (isMe) {
+                foundThisRound = true;
+                showBoundingBox(null);
+                setHoldRingFound();
+                holdStatus.innerText = "You found it! Waiting for the round to end...";
+                flashScreen('green');
+                spawnConfetti(70);
+                playWinSound();
+                showToast(
+                    `🎯 You found it! <span class="text-emerald-400">+${data.points_earned} pts</span> (${ordinal(data.rank)} place)${streakTag ? `<br><span class="text-orange-400 text-xs">${streakTag}</span>` : ''}`,
+                    { className: 'bg-emerald-950/95 border-emerald-700 text-emerald-100', duration: 3200 }
+                );
+            } else {
+                playSoftChime();
+                showToast(
+                    `<span class="text-gray-100">${data.name}</span> found it! <span class="text-cyan-400">+${data.points_earned} pts</span> (${ordinal(data.rank)})${streakTag ? ` <span class="text-orange-400 text-xs">${streakTag}</span>` : ''}`,
+                    { className: 'bg-gray-900/95 border-gray-700 text-gray-200', duration: 2400 }
+                );
+            }
+        });
+
+        function ordinal(n) {
+            const s = ['th', 'st', 'nd', 'rd'];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        // Round is fully over -- timeout, host skip, or everyone found it. Show the leaderboard.
+        socket.on('round_summary', (data) => {
+            foundThisRound = true;
+            if (frameInterval) clearInterval(frameInterval);
+            videoContainer.classList.remove('glow-active');
+            showBoundingBox(null);
+            lastKnownPlayers = data.scores;
+
+            const titles = {
+                timeout: "Time's Up!",
+                skipped: "Round Skipped",
+                all_found: "Everyone Found It!"
+            };
+            const titleColors = {
+                timeout: 'text-red-400',
+                skipped: 'text-gray-300',
+                all_found: 'text-emerald-400'
+            };
+
+            let title = titles[data.reason] || "Round Over!";
+            let titleClass = titleColors[data.reason] || 'text-white';
+            if (data.is_final_round && data.reason !== 'skipped') {
+                title = '🏁 Final Round Complete!';
+                titleClass = 'text-yellow-400';
+                playFinalRoundFanfare();
+            }
+            document.getElementById('lb-title').innerText = title;
+            document.getElementById('lb-title').className = `text-3xl font-black mb-1 ${titleClass}`;
+            document.getElementById('lb-message').innerText = data.message;
+
+            // Kahoot-style suspense: reveal the leaderboard bottom-to-top, one row at a
+            // time, so the top spots land with a beat of anticipation.
+            const lbList = document.getElementById('lb-list');
+            lbList.innerHTML = '';
+            const rows = data.leaderboard.map((p, i) => {
+                const color = colorForPlayer(p.sid, p);
+                const rowClass = i === 0 ? 'lb-row-1' : i === 1 ? 'lb-row-2' : i === 2 ? 'lb-row-3' : 'bg-gray-950 border-gray-800';
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                const li = document.createElement('li');
+                li.className = `flex items-center justify-between border rounded-lg px-3 py-2 opacity-0 ${rowClass}`;
+                li.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm w-5 text-center">${medal}</span>
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black text-gray-950" style="background:${color}">${avatarFor(p)}</span>
+                        <span class="text-sm font-semibold">${p.name}</span>
+                        ${streakBadge(p.streak)}
+                    </div>
+                    <span class="font-mono font-bold text-emerald-400 text-sm">${p.score}</span>
+                `;
+                return li;
+            });
+            // Insert placeholders in correct top-to-bottom order up front, then reveal
+            // starting from the bottom row (lowest rank) climbing up to 1st place.
+            rows.forEach(li => lbList.appendChild(li));
+            const revealOrder = [...rows].reverse();
+            revealOrder.forEach((li, idx) => {
+                setTimeout(() => {
+                    li.classList.remove('opacity-0');
+                    li.classList.add('target-pop');
+                    playSoftChime();
+                }, idx * 350);
+            });
+
+            const breakdown = document.getElementById('lb-breakdown');
+            const foundNames = data.found.map(f => `${f.name} (+${f.points})`).join(', ');
+            const missedNames = data.missed.map(m => m.name).join(', ');
+            breakdown.innerHTML = `
+                ${data.found.length ? `<div><span class="text-emerald-400 font-semibold">Found:</span> ${foundNames}</div>` : ''}
+                ${data.missed.length ? `<div><span class="text-gray-500 font-semibold">No find:</span> ${missedNames}</div>` : ''}
+            `;
+
+            if (data.reason === 'skipped') {
+                playSkipSound();
+            } else if (data.reason === 'timeout' && data.found.length === 0) {
+                flashScreen('red');
+                playTimeoutSound();
+            } else if (data.reason === 'all_found') {
+                spawnConfetti(60);
+            }
+
+            leaderboardModal.classList.remove('hidden');
+
+            document.getElementById('lb-host-continue').classList.toggle('hidden', !isHost);
+            document.getElementById('lb-guest-wait').classList.toggle('hidden', isHost);
+            const continueBtn = document.getElementById('lb-continue-btn');
+            continueBtn.disabled = false;
+            continueBtn.innerText = data.is_final_round ? 'See Final Results' : 'Continue to Next Round';
+        });
+
+        socket.on('match_ended', (data) => {
+            if (frameInterval) clearInterval(frameInterval);
+            videoContainer.classList.remove('glow-active');
+            leaderboardModal.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+
+            const ranked = data.ranking.map(sid => ({ sid, ...data.scores[sid] }));
+            const medals = ['🥇', '🥈', '🥉'];
+            const list = document.getElementById('podium-list');
+            list.innerHTML = '';
+
+            const winner = ranked[0];
+            const winnerBanner = document.getElementById('podium-winner-banner');
+            if (winner) {
+                winnerBanner.classList.remove('hidden');
+                document.getElementById('podium-winner-avatar').style.background = colorForPlayer(winner.sid, winner);
+                document.getElementById('podium-winner-avatar').innerText = avatarFor(winner);
+                document.getElementById('podium-winner-name').innerText = winner.name;
+                document.getElementById('podium-winner-score').innerText = `${winner.score} pts${winner.streak >= 2 ? ` \u2022 🔥 ${winner.streak}-streak` : ''}`;
+            } else {
+                winnerBanner.classList.add('hidden');
+            }
+
+            // Skip the winner in the regular list -- they already got the spotlight banner.
+            ranked.slice(1).forEach((p, i) => {
+                const color = colorForPlayer(p.sid, p);
+                const medal = medals[i + 1] || `${i + 2}.`;
+                list.innerHTML += `
+                    <li class="flex items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-4 py-3">
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg">${medal}</span>
+                            <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-gray-950" style="background:${color}">${avatarFor(p)}</span>
+                            <span class="font-semibold text-gray-100">${p.name}</span>
+                            ${streakBadge(p.streak)}
+                        </div>
+                        <span class="font-mono font-bold text-emerald-400">${p.score} pts</span>
+                    </li>
+                `;
+            });
+
+            document.getElementById('podium-host-actions').classList.toggle('hidden', !isHost);
+            document.getElementById('podium-guest-actions').classList.toggle('hidden', isHost);
+            podiumModal.classList.remove('hidden');
+            // Confetti cannon: a bigger, double-barrel burst for the final podium reveal.
+            spawnConfetti(160);
+            setTimeout(() => spawnConfetti(100), 350);
+            playWinSound();
+        });
+
+        socket.on('match_reset', (data) => {
+            lastKnownPlayers = data.players;
+            lastWinnerSid = null;
+            winStreak = 0;
+            seenPlayerSids = new Set(Object.keys(data.players));
+            document.getElementById('podium-winner-banner').classList.add('hidden');
+            updatePlayerList(data.players);
+            podiumModal.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            waitingScreen.classList.remove('hidden');
+            renderRoleControls();
+        });
+
+        socket.on('error', (data) => alert(data.message));
+    </script>
+</body>
+</html>
