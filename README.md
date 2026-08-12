@@ -18,8 +18,10 @@ Software needed: Visual Studio Code, Web browser
 8. Drag this .onnx file into the "models" folder in the VS Code explorer
 9. Download labels.txt and put it into the "models" folder
 10. You should now have app-v3.py, requirements.txt, and Dockerfile inside the "code" folder, index-v3.html inside the "templates" folder, and the .onnx file and labels.txt inside the "models" folder
+
 NOTE: These files should be on your Jetson. We are just using VS Code to see what files are on your Jetson
-11. Make sure you have python installed. If not, run "sudo apt update" then "sudo apt install python3 python3-pip python3-venv"
+
+11. Make sure you have python installed. If not, run "sudo apt update" then "sudo apt install python3 python3-pip python3-venv" in the terminal
 12. Use "python3 --version" and "pip3 --version" to make sure everything is working
 13. In the Jetson terminal in VS Code, use "cd" to move into the "code" folder (ex. "cd scavenger_app/code")
 14. Run this command in the Jetson terminal in VS Code: "docker build -t my-jetson-app ." (Yes, the period at the end is included.)
