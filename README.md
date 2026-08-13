@@ -19,7 +19,48 @@ If that doesn't work just read below
 
 If that doesn't work I don't know what to tell you
 
-This game can be played alone or with friends. When first opening the application, the user will see a home page with an option to enter a name and pick an avatar. After creating their player, they can either create a room or join another user's room via a game pin. Game pins are generated after a player creates a room. After joining a room, the user will either see host controls (if they started the room) or will see a waiting screen. After the host sets the round duration, number of rounds, and the item pool, they can start the game. During the game, the user will see a prompt to find an object. Depending on how long the host decided, the user has a certain amount of time to put the object in view of the camera. If the object detection model sees the correct object, it will start to fill up the progress circle up to 100%. Wins are not instantaneous, it requires the object to be held in view for a second or two. This prevents accidental detections where the model has a brief split second mistake. When someone finds the object, the app will let all user know who found the object and how many points they get. Other players will still have the chance to find the object until the timer runs out. Points are awarded based on speed. 0 points are awarded to players who failed to find the object. At the end of the round a leaderboard will show with all players and their points. During this time the game will only move on once the host clicks the continue button. All user's can leave at any time, and the host can end the game at any time. Unfortunately, in order to play the game with friends you must be on the same network. Connecting to the mobile hotspot of the host server is recommended.
+Joining a Game
+
+The game can be played alone or with friends.
+On the home page, players enter their name and choose an avatar.
+Players can either:
+Create a room, which generates a game PIN.
+Join a room using another player's game PIN.
+The host sees the host controls, while other players see a waiting screen.
+Setting Up the Game
+
+The host chooses:
+
+Round duration
+Number of rounds
+Item pool
+
+Once everything is configured, the host can start the game.
+
+Playing a Round
+
+Players receive a prompt telling them which object to find.
+Players have the amount of time set by the host to put the object in front of their camera.
+The object detection model checks whether the correct object is visible.
+When detected, a progress circle begins filling toward 100%.
+The object must remain visible for 1–2 seconds before the find is confirmed. This prevents brief detection errors from counting as a successful find.
+
+Scoring & Leaderboard
+
+When a player finds the object, all players are notified of who found it and how many points they earned.
+Other players can continue searching until the timer ends.
+Points are awarded based on how quickly the object was found.
+Players who fail to find the object receive 0 points.
+After each round, a leaderboard displays all players and their scores.
+The game only continues when the host presses Continue.
+
+Leaving & Network Requirements
+
+Players can leave at any time.
+The host can end the game at any time.
+Multiplayer requires everyone to be connected to the same network as the host server.
+Using the host's mobile hotspot is recommended, since all players must be on the same network as the server.
+
 <img width="2559" height="1414" alt="image" src="https://github.com/user-attachments/assets/4cdec3d9-d257-4315-9c08-95040d61e477" />
 
 
