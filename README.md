@@ -12,8 +12,11 @@ I trained the model with 200 epochs and the default learning rate and batch size
 ---------------------GAMEPLAY---------------------
 
 Youtube video: https://youtu.be/fUuX2dF2iHM
+
 If the youtube video doesn't work, you can download the video here: https://drive.google.com/file/d/1FWbshRrPS0YmSFdE0afjmftXEk1BP6cj/view?usp=sharing
+
 If that doesn't work just read below
+
 If that doesn't work I don't know what to tell you
 
 This game can be played alone or with friends. When first opening the application, the user will see a home page with an option to enter a name and pick an avatar. After creating their player, they can either create a room or join another user's room via a game pin. Game pins are generated after a player creates a room. After joining a room, the user will either see host controls (if they started the room) or will see a waiting screen. After the host sets the round duration, number of rounds, and the item pool, they can start the game. During the game, the user will see a prompt to find an object. Depending on how long the host decided, the user has a certain amount of time to put the object in view of the camera. If the object detection model sees the correct object, it will start to fill up the progress circle up to 100%. Wins are not instantaneous, it requires the object to be held in view for a second or two. This prevents accidental detections where the model has a brief split second mistake. When someone finds the object, the app will let all user know who found the object and how many points they get. Other players will still have the chance to find the object until the timer runs out. Points are awarded based on speed. 0 points are awarded to players who failed to find the object. At the end of the round a leaderboard will show with all players and their points. During this time the game will only move on once the host clicks the continue button. All user's can leave at any time, and the host can end the game at any time. Unfortunately, in order to play the game with friends you must be on the same network. Connecting to the mobile hotspot of the host server is recommended.
