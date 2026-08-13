@@ -1,7 +1,7 @@
 # Scavenger_Hunt
 This is my NVIDIA project. It is an application that runs a flask app on the local network that allows multiple people to play a scavenger hunt game on multiple devices. The objective is to find whatever object the game tells you to find, and the game will know if you found it using an object detection model.
 
----------------------AI MODEL---------------------
+## AI MODEL
 
 The model was trained using the jetson-inference detectnet.
 
@@ -9,7 +9,7 @@ The dataset I used can be found at https://universe.roboflow.com/customdatasetyo
 
 I trained the model with 200 epochs and the default learning rate and batch size.
 
----------------------GAMEPLAY---------------------
+## GAMEPLAY
 
 Youtube video: https://youtu.be/fUuX2dF2iHM
 
@@ -19,7 +19,7 @@ If that doesn't work just read below
 
 If that doesn't work I don't know what to tell you
 
-Joining a Game
+### Joining a Game
 
 The game can be played alone or with friends.
 On the home page, players enter their name and choose an avatar.
@@ -37,7 +37,7 @@ Item pool
 
 Once everything is configured, the host can start the game.
 
-Playing a Round
+### Playing a Round
 
 Players receive a prompt telling them which object to find.
 Players have the amount of time set by the host to put the object in front of their camera.
@@ -45,7 +45,7 @@ The object detection model checks whether the correct object is visible.
 When detected, a progress circle begins filling toward 100%.
 The object must remain visible for 1–2 seconds before the find is confirmed. This prevents brief detection errors from counting as a successful find.
 
-Scoring & Leaderboard
+### Scoring & Leaderboard
 
 When a player finds the object, all players are notified of who found it and how many points they earned.
 Other players can continue searching until the timer ends.
@@ -54,7 +54,7 @@ Players who fail to find the object receive 0 points.
 After each round, a leaderboard displays all players and their scores.
 The game only continues when the host presses Continue.
 
-Leaving & Network Requirements
+### Leaving & Network Requirements
 
 Players can leave at any time.
 The host can end the game at any time.
@@ -64,7 +64,7 @@ Using the host's mobile hotspot is recommended, since all players must be on the
 <img width="2559" height="1414" alt="image" src="https://github.com/user-attachments/assets/4cdec3d9-d257-4315-9c08-95040d61e477" />
 
 
----------------------INSTALLATION INSTRUCTIONS---------------------
+## INSTALLATION INSTRUCTIONS
 
 These are installations instructions for people who have a Windows desktop or laptop and uses Windows terminology and applications. Mac and Linux users will have to find their respective terms and applications, and try their best to follow along.
 
